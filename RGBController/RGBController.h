@@ -1,14 +1,11 @@
-/*---------------------------------------------------------*\
-| RGBController.h                                           |
-|                                                           |
-|   OpenRGB's RGB controller hardware abstration layer,     |
-|   provides a generic representation of an RGB device      |
-|                                                           |
-|   Adam Honse (CalcProgrammer1)                02 Jun 2019 |
-|                                                           |
-|   This file is part of the OpenRGB project                |
-|   SPDX-License-Identifier: GPL-2.0-only                   |
-\*---------------------------------------------------------*/
+/*-----------------------------------------*\
+|  RGBController.h                          |
+|                                           |
+|  Definitions and types for generic RGB    |
+|  lighting controller interface            |
+|                                           |
+|  Adam Honse (CalcProgrammer1) 6/2/2019    |
+\*-----------------------------------------*/
 
 #pragma once
 
@@ -45,6 +42,7 @@ enum
     MODE_FLAG_HAS_RANDOM_COLOR          = (1 << 7), /* Mode has random color option     */
     MODE_FLAG_MANUAL_SAVE               = (1 << 8), /* Mode can manually be saved       */
     MODE_FLAG_AUTOMATIC_SAVE            = (1 << 9), /* Mode automatically saves         */
+    MODE_FLAG_HAS_TEMPRATURE            = (1 << 10),/* Mode has Temprature controll on white LEDs*/
 };
 
 /*------------------------------------------------------------------*\
@@ -87,6 +85,8 @@ public:
     unsigned int        speed_max;  /* speed maximum value          */
     unsigned int        brightness_min; /*brightness min value      */
     unsigned int        brightness_max; /*brightness max value      */
+    unsigned int        temprature_min; /*temprature min value      */
+    unsigned int        temprature_max; /*temprature max value      */
     unsigned int        colors_min; /* minimum number of mode colors*/
     unsigned int        colors_max; /* maximum numver of mode colors*/
 
@@ -95,6 +95,7 @@ public:
     \*--------------------------------------------------------------*/
     unsigned int        speed;  /* Mode speed parameter value       */
     unsigned int        brightness; /* Mode brightness value        */
+    unsigned int        temprature; /* Mode temprature value        */
     unsigned int        direction;  /* Mode direction value         */
     unsigned int        color_mode; /* Mode color selection         */
     std::vector<RGBColor>

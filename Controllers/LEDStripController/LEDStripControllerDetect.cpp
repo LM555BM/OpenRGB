@@ -78,12 +78,33 @@ void DetectLEDStripControllers()
                 {
                     dev.protocol = LED_PROTOCOL_BASIC_I2C;
                 }
+                else if(protocol_string == "tpm2_modified")
+                {
+                    dev.protocol = LED_PROTOCOL_TPM2_MODIFIED;
+                }
+            }
+
+            if(ledstrip_settings["devices"][device_idx].contains("led_kind"))
+            {
+                std::string led_kind_string = ledstrip_settings["devices"][device_idx]["led_kind"];
+                if(led_kind_string == "/")
+                {
+                    dev.led_kind = RGB_LED_STRIP;
+                }
+                else if(led_kind_string == "RGBW_LED_STRIP")
+                {
+                    dev.led_kind = RGBW_LED_STRIP;
+                }
+                else if(led_kind_string == "RGBCCT_LED_STRIP")
+                {
+                    dev.led_kind = RGBCCT_LED_STRIP;
+                }
             }
 
             std::string value = dev.port + "," + std::to_string(dev.baud) + "," + std::to_string(dev.num_leds);
 
             LEDStripController*     controller     = new LEDStripController();
-            controller->Initialize((char *)value.c_str(), dev.protocol);
+            controller->Initialize((char *)value.c_str(), dev.protocol, dev.led_kind);
 
             RGBController_LEDStrip* rgb_controller = new RGBController_LEDStrip(controller);
             rgb_controller->name                   = dev.name;

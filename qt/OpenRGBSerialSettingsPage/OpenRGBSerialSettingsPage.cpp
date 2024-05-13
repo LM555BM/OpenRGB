@@ -1,12 +1,3 @@
-/*---------------------------------------------------------*\
-| OpenRGBSerialSettingsPage.cpp                             |
-|                                                           |
-|   User interface for serial device configuration page     |
-|                                                           |
-|   This file is part of the OpenRGB project                |
-|   SPDX-License-Identifier: GPL-2.0-only                   |
-\*---------------------------------------------------------*/
-
 #include "OpenRGBSerialSettingsPage.h"
 #include "ui_OpenRGBSerialSettingsPage.h"
 #include "ResourceManager.h"
@@ -72,9 +63,32 @@ OpenRGBSerialSettingsPage::OpenRGBSerialSettingsPage(QWidget *parent) :
                 {
                     entry->ui->ProtocolComboBox->setCurrentIndex(2);
                 }
-                else if(protocol_string == "basic_i2c")
+                else if(protocol_string == "tpm2_modified")
                 {
                     entry->ui->ProtocolComboBox->setCurrentIndex(3);
+                }
+                else if(protocol_string == "basic_i2c")
+                {
+                    entry->ui->ProtocolComboBox->setCurrentIndex(4);
+                }
+
+            }
+
+            if(ledstrip_settings["devices"][device_idx].contains("led_kind"))
+            {
+                std::string led_kind_string = ledstrip_settings["devices"][device_idx]["led_kind"];
+
+                if(led_kind_string == "RGB_LED_STRIP")
+                {
+                    entry->ui->LEDKindComboBox->setCurrentIndex(0);
+                }
+                else if(led_kind_string == "RGBW_LED_STRIP")
+                {
+                    entry->ui->LEDKindComboBox->setCurrentIndex(1);
+                }
+                else if(led_kind_string == "RGBCCT_LED_STRIP")
+                {
+                    entry->ui->LEDKindComboBox->setCurrentIndex(2);
                 }
             }
 
@@ -169,8 +183,23 @@ void Ui::OpenRGBSerialSettingsPage::on_SaveSerialConfigurationButton_clicked()
                 ledstrip_settings["devices"][device_idx]["protocol"] = "tpm2";
                 break;
             case 3:
+                ledstrip_settings["devices"][device_idx]["protocol"] = "tpm2_modified";
+                break;
+            case 4:
                 ledstrip_settings["devices"][device_idx]["protocol"] = "basic_i2c";
                 break;
+        }
+
+        switch(entries[device_idx]->ui->LEDKindComboBox->currentIndex())
+        {
+            case 0:
+                ledstrip_settings["devices"][device_idx]["led_kind"] = "RGB_LED_STRIP";
+                break;
+            case 1:
+                ledstrip_settings["devices"][device_idx]["led_kind"] = "RGBW_LED_STRIP";
+                break;
+            case 2:
+                ledstrip_settings["devices"][device_idx]["led_kind"] = "RGBCCT_LED_STRIP";
         }
     }
 

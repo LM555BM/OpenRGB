@@ -29,12 +29,51 @@ RGBController_LEDStrip::RGBController_LEDStrip(LEDStripController* controller_pt
     description = "Serial LED Strip Device";
     location    = controller->GetLocation();
 
-    mode Direct;
-    Direct.name       = "Direct";
-    Direct.value      = 0;
-    Direct.flags      = MODE_FLAG_HAS_PER_LED_COLOR;
-    Direct.color_mode = MODE_COLORS_PER_LED;
-    modes.push_back(Direct);
+    if(controller->GetLEDKind() == RGB_LED_STRIP)
+    {
+        mode Direct;
+        Direct.name       = "Direct";
+        Direct.value      = 0;
+        Direct.flags      = MODE_FLAG_HAS_PER_LED_COLOR;
+
+        if(controller->GetProtocol() == LED_PROTOCOL_TPM2_MODIFIED)
+        {
+            Direct.flags |= MODE_FLAG_MANUAL_SAVE;
+        }
+
+        Direct.color_mode = MODE_COLORS_PER_LED;
+        modes.push_back(Direct);
+    }
+    else if(controller->GetLEDKind() == RGBW_LED_STRIP)
+    {
+        mode Direct;
+        Direct.name       = "Direct";
+        Direct.value      = 0;
+        Direct.flags      = MODE_FLAG_HAS_PER_LED_COLOR | MODE_FLAG_MANUAL_SAVE | MODE_FLAG_HAS_BRIGHTNESS;
+
+        Direct.color_mode = MODE_COLORS_PER_LED;
+        Direct.brightness_min = 0;
+        Direct.brightness_max = 255;
+        Direct.temprature_min = 0;
+        Direct.temprature_max = 255;
+        modes.push_back(Direct);
+    }
+
+    else if(controller->GetLEDKind() == RGBCCT_LED_STRIP)
+    {
+        mode Direct;
+        Direct.name       = "Direct";
+        Direct.value      = 0;
+        Direct.flags      = MODE_FLAG_HAS_PER_LED_COLOR | MODE_FLAG_MANUAL_SAVE | MODE_FLAG_HAS_BRIGHTNESS | MODE_FLAG_HAS_TEMPRATURE;
+
+        Direct.color_mode = MODE_COLORS_PER_LED;
+        Direct.brightness_min = 0;
+        Direct.brightness_max = 255;
+        Direct.temprature_min = 0;
+        Direct.temprature_max = 255;
+        modes.push_back(Direct);
+    }
+
 
     SetupZones();
 }
@@ -76,7 +115,17 @@ void RGBController_LEDStrip::ResizeZone(int /*zone*/, int /*new_size*/)
 
 void RGBController_LEDStrip::DeviceUpdateLEDs()
 {
-    controller->SetLEDs(colors);
+    //Evlt. reduzierbar da atribute immer vorhanden
+    /*
+    if(!(this->modes[active_mode].flags &= MODE_FLAG_HAS_BRIGHTNESS))
+    {
+        controller->SetLEDs(colors);
+    }
+    else if((this->modes[active_mode].flags &= (MODE_FLAG_HAS_BRIGHTNESS | MODE_FLAG_HAS_TEMPRATURE)))
+    {*/
+        controller->SetLEDs(colors,this->modes[active_mode].brightness,this->modes[active_mode].temprature);
+    //}
+
 }
 
 void RGBController_LEDStrip::UpdateZoneLEDs(int /*zone*/)
@@ -91,5 +140,14 @@ void RGBController_LEDStrip::UpdateSingleLED(int /*led*/)
 
 void RGBController_LEDStrip::DeviceUpdateMode()
 {
+
+}
+
+void RGBController_LEDStrip::DeviceSaveMode()
+{
+    //0x01 is the TPM2 controll sequence for saving the configuration (Only available with TMP2 Modified)
+    std::vector<GiveCommands> saveCommand;
+    saveCommand.push_back(0x01);
+    controller->WriteTPM2Modified(saveCommand);
 
 }

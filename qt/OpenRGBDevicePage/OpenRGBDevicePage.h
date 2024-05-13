@@ -1,21 +1,13 @@
-/*---------------------------------------------------------*\
-| OpenRGBDevicePage.h                                       |
-|                                                           |
-|   User interface for OpenRGB device page                  |
-|                                                           |
-|   This file is part of the OpenRGB project                |
-|   SPDX-License-Identifier: GPL-2.0-only                   |
-\*---------------------------------------------------------*/
+#ifndef OPENRGBDEVICEPAGE_H
+#define OPENRGBDEVICEPAGE_H
 
-#pragma once
-
-#include <QFrame>
 #include "ui_OpenRGBDevicePage.h"
 #include "RGBController.h"
 
-namespace Ui
-{
-    class OpenRGBDevicePage;
+#include <QFrame>
+
+namespace Ui {
+class OpenRGBDevicePage;
 }
 
 class Ui::OpenRGBDevicePage : public QFrame
@@ -46,6 +38,7 @@ private slots:
     void on_ZoneBox_currentIndexChanged(int index);
     void on_LEDBox_currentIndexChanged(int index);
     void on_BrightnessSlider_valueChanged(int value);
+    void on_TempratureSlider_valueChanged(int value);
     void on_ModeBox_currentIndexChanged(int index);
     void on_SpeedSlider_valueChanged(int value);
     void on_RedSpinBox_valueChanged(int red);
@@ -54,7 +47,6 @@ private slots:
     void on_SatSpinBox_valueChanged(int sat);
     void on_BlueSpinBox_valueChanged(int blue);
     void on_ValSpinBox_valueChanged(int val);
-    void on_HexLineEdit_textChanged(const QString &arg1);
     void on_DeviceViewBox_selectionChanged(QVector<int>);
 
     void on_SetAllButton_clicked();
@@ -75,9 +67,9 @@ private:
 
     bool InvertedSpeed      = false;
     bool InvertedBrightness = false;
+    bool InvertedTemprature = false;
     bool MultipleSelected   = false;
     bool DeviceViewShowing  = false;
-    bool UpdateHex          = true;
 
     QColor current_color;
     void updateColorUi();
@@ -91,3 +83,5 @@ signals:
     void SetAllDevices(unsigned char red, unsigned char green, unsigned char blue);
     void SaveSizeProfile();
 };
+
+#endif // OPENRGBDEVICEPAGE_H

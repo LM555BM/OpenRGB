@@ -1,12 +1,3 @@
-/*---------------------------------------------------------*\
-| OpenRGBSerialSettingsEntry.cpp                            |
-|                                                           |
-|   User interface entry for serial device configuration    |
-|                                                           |
-|   This file is part of the OpenRGB project                |
-|   SPDX-License-Identifier: GPL-2.0-only                   |
-\*---------------------------------------------------------*/
-
 #include "OpenRGBSerialSettingsEntry.h"
 #include "ui_OpenRGBSerialSettingsEntry.h"
 
@@ -21,7 +12,12 @@ OpenRGBSerialSettingsEntry::OpenRGBSerialSettingsEntry(QWidget *parent) :
     ui->ProtocolComboBox->addItem("Keyboard Visualizer");
     ui->ProtocolComboBox->addItem("Adalight");
     ui->ProtocolComboBox->addItem("TPM2");
+    ui->ProtocolComboBox->addItem("TPM2 Modified");
     ui->ProtocolComboBox->addItem("Basic I2C");
+
+    ui->LEDKindComboBox->addItem("RGB");
+    ui->LEDKindComboBox->addItem("RGBW");
+    ui->LEDKindComboBox->addItem("RGBCCT");
 }
 
 OpenRGBSerialSettingsEntry::~OpenRGBSerialSettingsEntry()
@@ -39,7 +35,7 @@ void OpenRGBSerialSettingsEntry::changeEvent(QEvent *event)
 
 void Ui::OpenRGBSerialSettingsEntry::on_ProtocolComboBox_currentIndexChanged(int index)
 {
-    if(index == 3)
+    if(index == 4)
     {
         ui->BaudLabel->setText("Address:");
     }
@@ -47,4 +43,17 @@ void Ui::OpenRGBSerialSettingsEntry::on_ProtocolComboBox_currentIndexChanged(int
     {
         ui->BaudLabel->setText("Baud:");
     }
+
+    if(index == 3)
+    {
+        ui->LEDKindComboBox->show();
+        ui->LEDKindLabel->show();
+    }
+    else
+    {
+        ui->LEDKindComboBox->setCurrentIndex(0);
+        ui->LEDKindComboBox->hide();
+        ui->LEDKindLabel->hide();
+    }
 }
+

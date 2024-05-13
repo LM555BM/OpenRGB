@@ -25,13 +25,23 @@
 #endif
 
 typedef unsigned int    led_protocol;
+typedef unsigned int    kind_of_led;
+typedef unsigned char   GiveCommands;
 
 enum
 {
     LED_PROTOCOL_KEYBOARD_VISUALIZER,
     LED_PROTOCOL_ADALIGHT,
     LED_PROTOCOL_TPM2,
-    LED_PROTOCOL_BASIC_I2C
+    LED_PROTOCOL_BASIC_I2C,
+    LED_PROTOCOL_TPM2_MODIFIED
+};
+
+enum
+{
+    RGB_LED_STRIP,
+    RGBW_LED_STRIP,
+    RGBCCT_LED_STRIP,
 };
 
 struct LEDStripDevice
@@ -41,6 +51,7 @@ struct LEDStripDevice
     unsigned int    baud;
     unsigned int    num_leds;
     led_protocol    protocol;
+    kind_of_led     led_kind;
 };
 
 class LEDStripController
@@ -49,21 +60,26 @@ public:
     LEDStripController();
     ~LEDStripController();
 
-    void        Initialize(char* ledstring, led_protocol proto);
+    void        Initialize(char* ledstring, led_protocol proto, kind_of_led kind);
 
     void        InitializeI2C(char* i2cname);
     void        InitializeSerial(char* portname, int baud);
     void        InitializeUDP(char* clientname, char* port);
 
-    char*       GetLEDString();
-    std::string GetLocation();
+    char*        GetLEDString();
+    std::string  GetLocation();
+    kind_of_led  GetLEDKind();
+    led_protocol GetProtocol();
 
-    void        SetLEDs(std::vector<RGBColor> colors);
+    void        SetLEDs(std::vector<RGBColor> colors, int brightness = 0, int temprature = 0);
 
     void        SetLEDsKeyboardVisualizer(std::vector<RGBColor> colors);
     void        SetLEDsAdalight(std::vector<RGBColor> colors);
     void        SetLEDsTPM2(std::vector<RGBColor> colors);
+    void        SetLEDsTPM2Modified(std::vector<RGBColor> colors,int brightness, int temprature);
     void        SetLEDsBasicI2C(std::vector<RGBColor> colors);
+
+    void        WriteTPM2Modified(std::vector<GiveCommands> command);
 
     int num_leds;
 
@@ -78,6 +94,7 @@ private:
     i2c_smbus_interface *i2cport;
     unsigned char i2c_addr;
     led_protocol protocol;
+    kind_of_led led_kind;
 };
 
 #endif

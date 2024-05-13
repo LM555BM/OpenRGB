@@ -10,6 +10,7 @@
 #include <fstream>
 #include <iostream>
 #include <string>
+#include <QDebug>
 
 LEDStripController::LEDStripController()
 {
@@ -19,9 +20,11 @@ LEDStripController::LEDStripController()
 
 LEDStripController::~LEDStripController()
 {
+    serialport->serial_close();
+    delete serialport;
 }
 
-void LEDStripController::Initialize(char* ledstring, led_protocol proto)
+void LEDStripController::Initialize(char* ledstring, led_protocol proto, kind_of_led kind)
 {
     LPSTR   numleds = NULL;
     LPSTR   source = NULL;
@@ -30,6 +33,7 @@ void LEDStripController::Initialize(char* ledstring, led_protocol proto)
 
     //Set the protocol
     protocol = proto;
+    led_kind = kind;
 
     //Assume serial device unless a different protocol is specified
     bool    serial = TRUE;
@@ -119,7 +123,7 @@ void LEDStripController::InitializeSerial(char* portname, int baud)
     portname = strtok(portname, "\r");
     port_name = portname;
     baud_rate = baud;
-    serialport = new serial_port(port_name.c_str(), baud_rate);
+    serialport = new serial_port(port_name.c_str(), baud_rate, SERIAL_PORT_PARITY_NONE, SERIAL_PORT_SIZE_8, SERIAL_PORT_STOP_BITS_1, false);
     udpport = NULL;
     i2cport = NULL;
 }
@@ -159,7 +163,17 @@ char* LEDStripController::GetLEDString()
     return(led_string);
 }
 
-void LEDStripController::SetLEDs(std::vector<RGBColor> colors)
+kind_of_led LEDStripController::GetLEDKind()
+{
+    return led_kind;
+}
+
+led_protocol LEDStripController::GetProtocol()
+{
+    return protocol;
+}
+
+void LEDStripController::SetLEDs(std::vector<RGBColor> colors, int brightness, int temprature)
 {
     switch(protocol)
     {
@@ -178,6 +192,10 @@ void LEDStripController::SetLEDs(std::vector<RGBColor> colors)
         case LED_PROTOCOL_BASIC_I2C:
             SetLEDsBasicI2C(colors);
             break;
+
+        case LED_PROTOCOL_TPM2_MODIFIED:
+            SetLEDsTPM2Modified(colors, brightness, temprature);
+            break;
     }
 }
 
@@ -195,7 +213,7 @@ void LEDStripController::SetLEDsKeyboardVisualizer(std::vector<RGBColor> colors)
     |   n+1: Checksum MSB                                           |
     |   n+2: Checksum LSB                                           |
     \*-------------------------------------------------------------*/
-    unsigned int payload_size   = (unsigned int)(colors.size() * 3);
+    unsigned int payload_size   = (colors.size() * 3);
     unsigned int packet_size    = payload_size + 3;
 
     serial_buf = new unsigned char[packet_size];
@@ -265,7 +283,7 @@ void LEDStripController::SetLEDsAdalight(std::vector<RGBColor> colors)
     |   5: Checksum (MSB xor LSB xor 0x55)                          |
     |   6-n: Data Bytes                                             |
     \*-------------------------------------------------------------*/
-    unsigned int led_count      = (unsigned int)colors.size();
+    unsigned int led_count      = colors.size();
     unsigned int payload_size   = (led_count * 3);
     unsigned int packet_size    = payload_size + 6;
 
@@ -306,7 +324,7 @@ void LEDStripController::SetLEDsAdalight(std::vector<RGBColor> colors)
 
 void LEDStripController::SetLEDsTPM2(std::vector<RGBColor> colors)
 {
-    unsigned char *serial_buf;
+   unsigned char *serial_buf;
 
     /*-------------------------------------------------------------*\
     | TPM2 Protocol                                                 |
@@ -320,7 +338,7 @@ void LEDStripController::SetLEDsTPM2(std::vector<RGBColor> colors)
     |   4-n: Data Bytes                                             |
     |   n+1: Packet End Byte (0x36)                                 |
     \*-------------------------------------------------------------*/
-    unsigned int payload_size   = (unsigned int)(colors.size() * 3);
+    unsigned int payload_size   = (colors.size() * 3);
     unsigned int packet_size    = payload_size + 5;
 
     serial_buf = new unsigned char[packet_size];
@@ -352,9 +370,110 @@ void LEDStripController::SetLEDsTPM2(std::vector<RGBColor> colors)
     if (serialport != NULL)
     {
         serialport->serial_write((char *)serial_buf, packet_size);
+        qDebug("Sent over Serial");
+        for(int i=0;i<packet_size;i++)
+        {
+            qDebug("%02X",serial_buf[i]);
+        }
+        qDebug("");
+    }
+
+    else
+    {
+        qDebug("Couldn't Open serial Port");
+    }
+
+
+    delete[] serial_buf;
+}
+
+void LEDStripController::SetLEDsTPM2Modified(std::vector<RGBColor> colors, int brightness, int temprature)
+{
+    unsigned char *serial_buf;
+
+    /*-------------------------------------------------------------*\
+    | TPM2 Protocol                                                 |
+    |                                                               |
+    |   Packet size: Number of data bytes + 5                       |
+    |                                                               |
+    |   0: Packet Start Byte (0xC9)                                 |
+    |   1: Packet Type (0xDA - Data, 0xC0 - Command, 0xAA - Read)
+    |   2: Payload Size MSB                                         |
+    |   3: Payload Size LSB                                         |
+    |   4-n: Data Bytes                                             |
+    |   n+1: Packet End Byte (0x36)                                 |
+    \*-------------------------------------------------------------*/
+
+    unsigned int payload_size   = (colors.size() * 3);
+    unsigned int packet_size    = payload_size + 5;
+
+    serial_buf = new unsigned char[packet_size];
+
+    /*-------------------------------------------------------------*\
+    | Set up header and end byte                                    |
+    \*-------------------------------------------------------------*/
+    serial_buf[0x00]            = 0xC9;
+    serial_buf[0x01]            = 0xDA;
+    serial_buf[0x02]            = (payload_size >> 8);
+    serial_buf[0x03]            = (payload_size & 0xFF);
+    serial_buf[packet_size - 1] = 0x36;
+
+    /*-------------------------------------------------------------*\
+    | Copy in color data in RGB order                               |
+    \*-------------------------------------------------------------*/
+    for(unsigned int color_idx = 0; color_idx < colors.size(); color_idx++)
+    {
+        unsigned int color_offset = color_idx * 3;
+
+        serial_buf[0x04 + color_offset]     = RGBGetRValue(colors[color_idx]);
+        serial_buf[0x05 + color_offset]     = RGBGetGValue(colors[color_idx]);
+        serial_buf[0x06 + color_offset]     = RGBGetBValue(colors[color_idx]);
+    }
+
+    /*-------------------------------------------------------------*\
+    | Send the packet                                               |
+    \*-------------------------------------------------------------*/
+    if (serialport != NULL)
+    {
+        serialport->serial_write((char *)serial_buf, packet_size);
+        qDebug("Color Code");
+        for(int i=0;i<packet_size;i++)
+        {
+            qDebug("%02X",serial_buf[i]);
+        }
+        qDebug("");
+    }
+
+    else
+    {
+        qDebug("Couldn't Open serial Port");
     }
 
     delete[] serial_buf;
+
+
+    /*-------------------------------------------------------------*\
+    | Give the command for the Brightness if RGBW or RGBCCT         |
+    \*-------------------------------------------------------------*/
+    if(led_kind == RGBW_LED_STRIP | led_kind == RGBCCT_LED_STRIP)
+    {
+        std::vector<GiveCommands> brightnessCommand;
+        brightnessCommand.push_back(0x0A);
+        brightnessCommand.push_back(brightness);
+        WriteTPM2Modified(brightnessCommand);
+    }
+
+    /*-------------------------------------------------------------*\
+    | If RGBCCT furthermore send the temprature                     |
+    \*-------------------------------------------------------------*/
+    if(led_kind == RGBCCT_LED_STRIP)
+    {
+        std::vector<GiveCommands> tempratureCommand;
+        tempratureCommand.push_back(0xFF);
+        tempratureCommand.push_back(temprature);
+        WriteTPM2Modified(tempratureCommand);
+    }
+
 }
 
 void LEDStripController::SetLEDsBasicI2C(std::vector<RGBColor> colors)
@@ -403,4 +522,68 @@ void LEDStripController::SetLEDsBasicI2C(std::vector<RGBColor> colors)
     {
         i2cport->i2c_smbus_write_byte(i2c_addr, 0xFF);
     }
+}
+
+void LEDStripController::WriteTPM2Modified(std::vector<GiveCommands> commands)
+{
+    unsigned char *serial_buf;
+
+    /*-------------------------------------------------------------*\
+    | TPM2 Protocol                                                 |
+    |                                                               |
+    |   Packet size: Number of data bytes + 5                       |
+    |                                                               |
+    |   0: Packet Start Byte (0xC9)                                 |
+    |   1: Packet Type (0xDA - Data, 0xC0 - Command, 0xAA - Read)
+    |   2: Payload Size MSB                                         |
+    |   3: Payload Size LSB                                         |
+    |   4-n: Data Bytes                                             |
+    |   n+1: Packet End Byte (0x36)                                 |
+    \*-------------------------------------------------------------*/
+
+    unsigned int payload_size   = commands.size();
+    unsigned int packet_size    = payload_size + 5;
+
+    serial_buf = new unsigned char[packet_size];
+
+    /*-------------------------------------------------------------*\
+    | Set up header and end byte                                    |
+    \*-------------------------------------------------------------*/
+    serial_buf[0x00]            = 0xC9;
+    serial_buf[0x01]            = 0xC0;
+    serial_buf[0x02]            = ((payload_size - 1) >> 8);
+    serial_buf[0x03]            = ((payload_size - 1) & 0xFF);
+    serial_buf[packet_size - 1] = 0x36;
+
+
+    /*-------------------------------------------------------------*\
+    | Copy in color data in RGB order                               |
+    \*-------------------------------------------------------------*/
+    for(unsigned int commands_idx = 0; commands_idx < commands.size(); commands_idx++)
+    {
+        serial_buf[0x04 + commands_idx]     = commands[commands_idx];
+    }
+
+    /*-------------------------------------------------------------*\
+    | Send the packet                                               |
+    \*-------------------------------------------------------------*/
+
+    if (serialport != NULL)
+    {
+        serialport->serial_write((char *)serial_buf, packet_size);
+
+        qDebug("Command Code");
+        for(int i=0;i<packet_size;i++)
+        {
+            qDebug("%02X",serial_buf[i]);
+        }
+        qDebug("");
+    }
+
+    else
+    {
+        qDebug("Couldn't Open serial Port");
+    }
+
+    delete[] serial_buf;
 }

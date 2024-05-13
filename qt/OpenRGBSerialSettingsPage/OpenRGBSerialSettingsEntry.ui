@@ -20,7 +20,7 @@
    <string>Serial settings entry</string>
   </property>
   <layout class="QGridLayout" name="gridLayout">
-   <item row="1" column="0" colspan="2">
+   <item row="0" column="0">
     <widget class="QGroupBox" name="groupBox">
      <property name="title">
       <string/>
@@ -75,6 +75,16 @@
       </item>
       <item row="3" column="3">
        <widget class="QComboBox" name="ProtocolComboBox"/>
+      </item>
+      <item row="3" column="4">
+       <widget class="QLabel" name="LEDKindLabel">
+        <property name="text">
+         <string>LED Type</string>
+        </property>
+       </widget>
+      </item>
+      <item row="3" column="5">
+       <widget class="QComboBox" name="LEDKindComboBox"/>
       </item>
      </layout>
     </widget>

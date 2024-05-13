@@ -1,12 +1,3 @@
-/*---------------------------------------------------------*\
-| OpenRGBDevicePage.cpp                                     |
-|                                                           |
-|   User interface for OpenRGB device page                  |
-|                                                           |
-|   This file is part of the OpenRGB project                |
-|   SPDX-License-Identifier: GPL-2.0-only                   |
-\*---------------------------------------------------------*/
-
 #include "OpenRGBDialog2.h"
 #include "OpenRGBDevicePage.h"
 #include "OpenRGBZoneResizeDialog.h"
@@ -146,9 +137,6 @@ OpenRGBDevicePage::~OpenRGBDevicePage()
 
 void OpenRGBDevicePage::changeEvent(QEvent *event)
 {
-    /*-----------------------------------------------------*\
-    | Retranslate the UI when a language change event occurs|
-    \*-----------------------------------------------------*/
     if(event->type() == QEvent::LanguageChange)
     {
         ui->retranslateUi(this);
@@ -760,6 +748,14 @@ void Ui::OpenRGBDevicePage::on_BrightnessSlider_valueChanged(int /*value*/)
     UpdateMode();
 }
 
+void Ui::OpenRGBDevicePage::on_TempratureSlider_valueChanged(int /*value*/)
+{
+    /*-----------------------------------------------------*\
+    | Change device mode                                    |
+    \*-----------------------------------------------------*/
+    UpdateMode();
+}
+
 void Ui::OpenRGBDevicePage::on_SpeedSlider_valueChanged(int /*value*/)
 {
     /*-----------------------------------------------------*\
@@ -799,6 +795,7 @@ void Ui::OpenRGBDevicePage::UpdateModeUi()
         bool supports_random        = ( device->modes[selected_mode].flags & MODE_FLAG_HAS_RANDOM_COLOR );
         bool supports_speed         = ( device->modes[selected_mode].flags & MODE_FLAG_HAS_SPEED );
         bool supports_brightness    = ( device->modes[selected_mode].flags & MODE_FLAG_HAS_BRIGHTNESS);
+        bool supports_temprature    = ( device->modes[selected_mode].flags & MODE_FLAG_HAS_TEMPRATURE);
         bool supports_dir_lr        = ( device->modes[selected_mode].flags & MODE_FLAG_HAS_DIRECTION_LR );
         bool supports_dir_ud        = ( device->modes[selected_mode].flags & MODE_FLAG_HAS_DIRECTION_UD );
         bool supports_dir_hv        = ( device->modes[selected_mode].flags & MODE_FLAG_HAS_DIRECTION_HV );
@@ -873,6 +870,44 @@ void Ui::OpenRGBDevicePage::UpdateModeUi()
             ui->BrightnessSlider->blockSignals(true);
             ui->BrightnessSlider->setEnabled(false);
             ui->BrightnessSlider->blockSignals(false);
+        }
+
+        if(supports_temprature)
+        {
+            ui->TempratureSlider->blockSignals(true);
+            int current_temprature;
+            InvertedTemprature = device->modes[selected_mode].temprature_min > device->modes[selected_mode].temprature_max;
+
+            if(InvertedTemprature)
+            {
+                /*-----------------------------------------------------*\
+                | If Temprature Slider is inverted, invert value        |
+                \*-----------------------------------------------------*/
+                ui->TempratureSlider->setMinimum(device->modes[selected_mode].temprature_max);
+                ui->TempratureSlider->setMaximum(device->modes[selected_mode].temprature_min);
+                current_temprature = device->modes[selected_mode].temprature_min - device->modes[selected_mode].temprature + device->modes[selected_mode].temprature_max;
+            }
+            else
+            {
+                ui->TempratureSlider->setMinimum(device->modes[selected_mode].temprature_min);
+                ui->TempratureSlider->setMaximum(device->modes[selected_mode].temprature_max);
+                current_temprature = device->modes[selected_mode].temprature;
+            }
+
+            ui->TempratureSlider->setValue(current_temprature);
+            ui->TempratureSlider->setEnabled(true);
+            ui->TempratureSlider->show();
+            ui->TempratureLabel->show();
+            ui->TempratureSlider->blockSignals(false);
+        }
+
+        else
+        {
+            ui->TempratureSlider->blockSignals(true);
+            ui->TempratureSlider->setEnabled(false);
+            ui->TempratureSlider->hide();
+            ui->TempratureLabel->hide();
+            ui->TempratureSlider->blockSignals(false);
         }
 
         ui->DirectionBox->blockSignals(true);
@@ -1120,6 +1155,7 @@ void Ui::OpenRGBDevicePage::UpdateMode()
     {
         int  current_speed          = 0;
         int  current_brightness     = 0;
+        int  current_temprature     = 0;
         bool current_per_led        = ui->PerLEDCheck->isChecked();
         bool current_mode_specific  = ui->ModeSpecificCheck->isChecked();
         bool current_random         = ui->RandomCheck->isChecked();
@@ -1208,6 +1244,24 @@ void Ui::OpenRGBDevicePage::UpdateMode()
         }
 
         /*-----------------------------------------------------*\
+        | If Temprature Slider is enabled, read the value       |
+        \*-----------------------------------------------------*/
+        if(ui->TempratureSlider->isEnabled())
+        {
+            /*-----------------------------------------------------*\
+            | If Temprature Slider is inverted, invert value        |
+            \*-----------------------------------------------------*/
+            if(InvertedTemprature)
+            {
+                current_temprature = device->modes[(unsigned int)current_mode].temprature_min - ui->TempratureSlider->value() + device->modes[current_mode].temprature_max;
+            }
+            else
+            {
+                current_temprature = ui->TempratureSlider->value();
+            }
+        }
+
+        /*-----------------------------------------------------*\
         | Don't set the mode if the current mode is invalid     |
         \*-----------------------------------------------------*/
         if((unsigned int)current_mode < device->modes.size())
@@ -1217,6 +1271,7 @@ void Ui::OpenRGBDevicePage::UpdateMode()
             \*-----------------------------------------------------*/
             device->modes[(unsigned int)current_mode].speed         = current_speed;
             device->modes[(unsigned int)current_mode].brightness    = current_brightness;
+            device->modes[(unsigned int)current_mode].temprature    = current_temprature;
 
             if(current_per_led)
             {
@@ -1251,10 +1306,6 @@ void Ui::OpenRGBDevicePage::UpdateMode()
 void Ui::OpenRGBDevicePage::SetDevice(unsigned char red, unsigned char green, unsigned char blue)
 {
     current_color.setRgb(red, green, blue);
-
-    /*-----------------------------------------------------*\
-    | Update the color UI                                   |
-    \*-----------------------------------------------------*/
     colorChanged();
 }
 
@@ -1316,27 +1367,13 @@ void Ui::OpenRGBDevicePage::SetCustomMode(unsigned char red, unsigned char green
 
 void Ui::OpenRGBDevicePage::on_SwatchBox_swatchChanged(const QColor color)
 {
-    /*-----------------------------------------------------*\
-    | Store the swatch color to the current color QColor    |
-    \*-----------------------------------------------------*/
     current_color = color;
-
-    /*-----------------------------------------------------*\
-    | Update the color UI                                   |
-    \*-----------------------------------------------------*/
     colorChanged();
 }
 
 void Ui::OpenRGBDevicePage::on_ColorWheelBox_colorChanged(const QColor color)
 {
-    /*-----------------------------------------------------*\
-    | Store the wheel color to the current color QColor     |
-    \*-----------------------------------------------------*/
     current_color = color;
-
-    /*-----------------------------------------------------*\
-    | Update the color UI                                   |
-    \*-----------------------------------------------------*/
     colorChanged();
 }
 
@@ -1347,130 +1384,47 @@ bool Ui::OpenRGBDevicePage::autoUpdateEnabled()
 
 void Ui::OpenRGBDevicePage::on_RedSpinBox_valueChanged(int red)
 {
-    /*-----------------------------------------------------*\
-    | Update the current color QColor red channel           |
-    \*-----------------------------------------------------*/
     current_color.setRed(red);
-
-    /*-----------------------------------------------------*\
-    | Update the color UI                                   |
-    \*-----------------------------------------------------*/
     colorChanged();
 }
 
 void Ui::OpenRGBDevicePage::on_HueSpinBox_valueChanged(int hue)
 {
-    /*-----------------------------------------------------*\
-    | Read the saturation and value box values              |
-    \*-----------------------------------------------------*/
     int sat = current_color.saturation();
     int val = current_color.value();
-
-    /*-----------------------------------------------------*\
-    | Update the current color QColor using HSV             |
-    \*-----------------------------------------------------*/
     current_color.setHsv(hue, sat, val);
 
-    /*-----------------------------------------------------*\
-    | Update the color UI                                   |
-    \*-----------------------------------------------------*/
     colorChanged();
 }
 
 void Ui::OpenRGBDevicePage::on_GreenSpinBox_valueChanged(int green)
 {
-    /*-----------------------------------------------------*\
-    | Update the current color QColor green channel         |
-    \*-----------------------------------------------------*/
     current_color.setGreen(green);
-
-    /*-----------------------------------------------------*\
-    | Update the color UI                                   |
-    \*-----------------------------------------------------*/
     colorChanged();
 }
 
 void Ui::OpenRGBDevicePage::on_SatSpinBox_valueChanged(int sat)
 {
-    /*-----------------------------------------------------*\
-    | Read the hue and value box values                     |
-    \*-----------------------------------------------------*/
     int hue = current_color.hue();
     int val = current_color.value();
-
-    /*-----------------------------------------------------*\
-    | Update the current color QColor using HSV             |
-    \*-----------------------------------------------------*/
     current_color.setHsv(hue, sat, val);
 
-    /*-----------------------------------------------------*\
-    | Update the color UI                                   |
-    \*-----------------------------------------------------*/
     colorChanged();
 }
 
 void Ui::OpenRGBDevicePage::on_BlueSpinBox_valueChanged(int blue)
 {
-    /*-----------------------------------------------------*\
-    | Update the current color QColor blue channel          |
-    \*-----------------------------------------------------*/
     current_color.setBlue(blue);
-
-    /*-----------------------------------------------------*\
-    | Update the color UI                                   |
-    \*-----------------------------------------------------*/
     colorChanged();
 }
 
 void Ui::OpenRGBDevicePage::on_ValSpinBox_valueChanged(int val)
 {
-    /*-----------------------------------------------------*\
-    | Read the hue and saturation box values                |
-    \*-----------------------------------------------------*/
     int hue = current_color.hue();
     int sat = current_color.saturation();
-
-    /*-----------------------------------------------------*\
-    | Update the current color QColor using HSV             |
-    \*-----------------------------------------------------*/
     current_color.setHsv(hue, sat, val);
 
-    /*-----------------------------------------------------*\
-    | Update the color UI                                   |
-    \*-----------------------------------------------------*/
     colorChanged();
-}
-
-void Ui::OpenRGBDevicePage::on_HexLineEdit_textChanged(const QString &arg1)
-{
-    /*-----------------------------------------------------*\
-    | Make an editable copy of the string                   |
-    \*-----------------------------------------------------*/
-    QString temp = arg1;
-
-    /*-----------------------------------------------------*\
-    | Remove # character so that #XXXXXX color codes are    |
-    | acceptable.  0xXXXXXX codes are already accepted by   |
-    | toInt().  Convert into an RGBColor.  Mask off the     |
-    | unused bits.                                          |
-    \*-----------------------------------------------------*/
-    RGBColor color = (RGBColor)(0x00FFFFFF & temp.replace("#", "").toInt(NULL, 16));
-
-    /*-----------------------------------------------------*\
-    | Store new color into the current color QColor         |
-    \*-----------------------------------------------------*/
-    current_color.setRed(RGBGetRValue(color));
-    current_color.setGreen(RGBGetGValue(color));
-    current_color.setBlue(RGBGetBValue(color));
-
-    /*-----------------------------------------------------*\
-    | Update the color UI, but set the UpdateHex flag to    |
-    | false so the hex edit box isn't updated while the user|
-    | is in the middle of typing a value.                   |
-    \*-----------------------------------------------------*/
-    UpdateHex = false;
-    colorChanged();
-    UpdateHex = true;
 }
 
 void Ui::OpenRGBDevicePage::on_DeviceViewBox_selectionChanged(QVector<int> indices)
@@ -1661,15 +1615,8 @@ void Ui::OpenRGBDevicePage::ShowDeviceView()
     \*-----------------------------------------------------*/
     unsigned int selected_mode = (unsigned int)ui->ModeBox->currentIndex();
 
-    /*-----------------------------------------------------*\
-    | Set device view showing flag to True                  |
-    \*-----------------------------------------------------*/
     DeviceViewShowing = true;
 
-    /*-----------------------------------------------------*\
-    | Only show device view if active mode is Per-LED and   |
-    | device contains at least one LED                      |
-    \*-----------------------------------------------------*/
     if(device->modes[selected_mode].flags & MODE_FLAG_HAS_PER_LED_COLOR && device->leds.size() >= 1)
     {
         ui->DeviceViewBoxFrame->show();
@@ -1678,14 +1625,7 @@ void Ui::OpenRGBDevicePage::ShowDeviceView()
 
 void Ui::OpenRGBDevicePage::HideDeviceView()
 {
-    /*-----------------------------------------------------*\
-    | Set device view showing flag to False                 |
-    \*-----------------------------------------------------*/
     DeviceViewShowing = false;
-
-    /*-----------------------------------------------------*\
-    | Hide device view                                      |
-    \*-----------------------------------------------------*/
     ui->DeviceViewBoxFrame->hide();
 }
 
@@ -1821,14 +1761,4 @@ void Ui::OpenRGBDevicePage::updateColorUi()
     ui->ValSpinBox->blockSignals(true);
     ui->ValSpinBox->setValue(current_color.value());
     ui->ValSpinBox->blockSignals(false);
-
-    /*-----------------------------------------------------*\
-    | Update Hex edit box                                   |
-    \*-----------------------------------------------------*/
-    if(UpdateHex)
-    {
-        ui->HexLineEdit->blockSignals(true);
-        ui->HexLineEdit->setText(QString().asprintf("%06X", (0x00FFFFFF & current_color.rgb())));
-        ui->HexLineEdit->blockSignals(false);
-    }
 }
